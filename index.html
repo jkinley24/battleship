@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battleship — Play vs AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>⚓ Battleship</h1>
+    <p class="tagline">Sink the enemy fleet before it sinks yours.</p>
+  </header>
+
+  <main>
+    <!-- Status / messages -->
+    <div id="status" class="status" role="status" aria-live="polite">
+      Place your ships to begin.
+    </div>
+
+    <!-- Setup controls -->
+    <section id="setup-controls" class="controls">
+      <button id="btn-rotate" type="button">Rotate: <span id="orientation-label">Horizontal</span></button>
+      <button id="btn-random" type="button">Place Randomly</button>
+      <button id="btn-start" type="button" disabled>Start Battle</button>
+      <button id="btn-reset-setup" type="button">Clear Board</button>
+      <div class="ship-tray" id="ship-tray"></div>
+    </section>
+
+    <!-- In-game controls -->
+    <section id="game-controls" class="controls hidden">
+      <button id="btn-new-game" type="button">New Game</button>
+      <span class="difficulty-wrap">
+        AI:
+        <select id="difficulty">
+          <option value="easy">Easy (random)</option>
+          <option value="hard" selected>Hard (hunt &amp; target)</option>
+        </select>
+      </span>
+    </section>
+
+    <div class="boards">
+      <div class="board-wrap">
+        <h2>Your Fleet</h2>
+        <div id="player-board" class="board" aria-label="Your board"></div>
+      </div>
+      <div class="board-wrap">
+        <h2>Enemy Waters</h2>
+        <div id="enemy-board" class="board enemy" aria-label="Enemy board"></div>
+      </div>
+    </div>
+
+    <section class="legend">
+      <span><span class="swatch ship"></span> Ship</span>
+      <span><span class="swatch hit"></span> Hit</span>
+      <span><span class="swatch miss"></span> Miss</span>
+      <span><span class="swatch sunk"></span> Sunk</span>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Built with Devin. Click a cell in <strong>Enemy Waters</strong> to fire.</p>
+  </footer>
+
+  <script src="game.js"></script>
+</body>
+</html>
