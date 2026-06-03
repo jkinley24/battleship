@@ -52,3 +52,63 @@ The enemy hover rule `.board.enemy .cell:not(.fired):hover { background: var(--w
 **Symptom (potential):** Clicking the same enemy cell twice, or the AI re-selecting a cell it already shot, would waste turns or corrupt state.
 
 **Fix:** `onEnemyCellClick` returns early if the targeted cell is already `hit`. The AI's `aiPickTarget()` filters out any already-hit cell both when draining its target queue and when hunting. Confirmed across 50 simulated AI games that no shot ever lands on a previously-fired cell.
+
+---
+
+# Redesign: Naval Command Center (shipbattle.dev parity)
+
+The UI/UX was reworked into a multi-screen "naval command center" inspired by
+[shipbattle.dev](https://shipbattle.dev). The following issues were found and fixed
+during that rewrite.
+
+## 6. Invalid CSS color token (regression of the original hover bug)
+
+**Symptom:** During the rewrite a CSS custom property was generated with a malformed
+value: `--ship-edge: #5e7governs;` — not a valid color.
+
+**Why it matters:** Exactly like bug #1, an invalid `var()` value is silently dropped
+by the browser. Any rule relying on that token would have rendered with no color and
+no error. Caught on review of the new `styles.css`.
+
+**Fix:** Replaced with a valid hex (`--ship-edge: #6a7f96`). Reinforces the standing
+rule: **all CSS custom properties must hold valid values, since failures are silent.**
+
+---
+
+## 7. Coordinate headers shifted the grid cell lookup
+
+**Symptom:** The redesigned boards add a row of column labels (1–10) and a column of
+row labels (A–J), so each board grid is 11×11 of DOM children, not 10×10. The original
+`cellEl()` math assumed a flat 10×10 grid and pointed at the wrong element.
+
+**Fix:** `buildGrid()` now emits a corner + 10 header cells, then for each row a header
++ 10 play cells. `cellEl(container, r, c)` indexes with `(r + 1) * (SIZE + 1) + (c + 1)`
+to skip the header row and per-row header. Verified by firing at known enemy ship cells
+read from `state.enemyShips` and confirming the correct cells flip to hit/miss.
+
+---
+
+## 8. Strict alternating turns vs. "extra shot on hit"
+
+**Behavior change:** The original build let the player fire again after a hit. The
+reference site uses **strict alternation** — exactly one shot per side per turn,
+regardless of hit or miss. The battle loop was changed so both `onEnemyCellClick` and
+`aiTurn` always pass the turn after resolving a shot. The `state.busy` input-lock is
+still held during the AI's delayed turn so the player can't sneak in shots. Verified in
+the browser: after a player hit, the status switches to the enemy's turn and the player
+board cannot be re-fired until control returns.
+
+---
+
+## 9. Admiral (probability-density) AI — legality & termination
+
+**Risk:** The new hard AI builds a probability map by sliding every remaining ship over
+the board. Bugs here could pick an already-fired cell, ignore known misses, or fail to
+finish a wounded ship.
+
+**Fix / verification:** Placements are rejected if they cross a known miss; cells that
+already cover an unresolved hit get a large weight so the AI prioritizes sinking wounded
+ships; the final selection skips any already-fired cell and falls back to a random
+untried cell if the map is empty. Confirmed `aiPickProbability()` returns a valid,
+unfired coordinate (e.g. `[4,4]`) with no exceptions, and that hunt/target queue
+draining takes precedence so partially-hit ships are pursued immediately.
