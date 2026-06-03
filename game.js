@@ -73,10 +73,11 @@ function newState() {
     allyHits: 0,
     enemyHits: 0,
     showEnemyShots: true,
+    hoverCell: null,
   };
 }
 function newAIState() {
-  return { mode: "hunt", targetQueue: [], hits: [] };
+  return { mode: "hunt", targetQueue: [] };
 }
 
 // ============================================================
@@ -396,11 +397,11 @@ function renderLog() {
 function renderBattle() {
   paintBoard($("battle-player-board"), state.playerBoard, state.playerShips, true);
   paintBoard($("battle-enemy-board"), state.enemyBoard, state.enemyShips, state.phase === "over");
-  // hide enemy shots on player board if toggled off
+  // hide enemy shots on player board if toggled off (both misses and hits/sunk markers)
   if (!state.showEnemyShots) {
     for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
       const cs = state.playerBoard[r][c];
-      if (cs.hit && cs.shipId === null) cellEl($("battle-player-board"), r, c).classList.remove("miss");
+      if (cs.hit) cellEl($("battle-player-board"), r, c).classList.remove("miss", "hit", "sunk");
     }
   }
   renderFleetStatus();
@@ -572,34 +573,66 @@ function aiPickProbability() {
   return best || aiPickRandom();
 }
 
-function aiRegisterHit(r, c, sunk) {
-  const ai = state.ai;
-  if (state.difficulty === "recruit") return; // no memory
-  if (sunk) { ai.mode = "hunt"; ai.hits = []; ai.targetQueue = []; return; }
-  ai.mode = "target";
-  ai.hits.push([r, c]);
-  const neighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
-  for (const [nr, nc] of neighbors) {
-    if (inBounds(nr, nc) && !state.playerBoard[nr][nc].hit) ai.targetQueue.push([nr, nc]);
+// Cells that are hit but belong to a ship that is not yet sunk (unresolved damage).
+function openHits() {
+  const res = [];
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    const cs = state.playerBoard[r][c];
+    if (cs.hit && cs.shipId !== null) {
+      const ship = state.playerShips[cs.shipId];
+      if (ship && !ship.sunk) res.push([r, c]);
+    }
   }
-  if (ai.hits.length >= 2) prioritizeLine();
+  return res;
 }
-function prioritizeLine() {
-  const ai = state.ai;
-  const rows = ai.hits.map((h) => h[0]);
-  const cols = ai.hits.map((h) => h[1]);
-  const sameRow = rows.every((x) => x === rows[0]);
-  const sameCol = cols.every((x) => x === cols[0]);
-  let line = [];
-  if (sameRow) {
-    const r = rows[0], cs = cols.slice().sort((a, b) => a - b);
-    line = [[r, cs[0] - 1], [r, cs[cs.length - 1] + 1]];
-  } else if (sameCol) {
-    const c = cols[0], rs = rows.slice().sort((a, b) => a - b);
-    line = [[rs[0] - 1, c], [rs[rs.length - 1] + 1, c]];
+
+// Rebuild the AI target queue from the board's unresolved hits. Recomputing from
+// the board (instead of a running list) means a sunk ship's cells drop out
+// automatically and adjacent wounded ships are tracked as separate clusters, so
+// the AI never "forgets" a wounded ship or builds a firing line across two ships.
+function aiRegisterHit(r, c, sunk) {
+  if (state.difficulty === "recruit") return; // no memory
+  const hits = openHits();
+  if (hits.length === 0) { state.ai.mode = "hunt"; state.ai.targetQueue = []; return; }
+  state.ai.mode = "target";
+  state.ai.targetQueue = aiTargetsFromHits(hits);
+}
+function aiTargetsFromHits(hits) {
+  const SIZE2 = SIZE;
+  const key = (r, c) => r * SIZE2 + c;
+  const hitSet = new Set(hits.map(([r, c]) => key(r, c)));
+  const seen = new Set();
+  const queue = [];
+  const open = (r, c) => inBounds(r, c) && !state.playerBoard[r][c].hit;
+  // group adjacent hits into clusters (one cluster ≈ one wounded ship)
+  for (const [r, c] of hits) {
+    if (seen.has(key(r, c))) continue;
+    const stack = [[r, c]], cluster = [];
+    seen.add(key(r, c));
+    while (stack.length) {
+      const [cr, cc] = stack.pop();
+      cluster.push([cr, cc]);
+      for (const [nr, nc] of [[cr - 1, cc], [cr + 1, cc], [cr, cc - 1], [cr, cc + 1]]) {
+        if (hitSet.has(key(nr, nc)) && !seen.has(key(nr, nc))) { seen.add(key(nr, nc)); stack.push([nr, nc]); }
+      }
+    }
+    const rows = cluster.map((h) => h[0]), cols = cluster.map((h) => h[1]);
+    const sameRow = rows.every((x) => x === rows[0]);
+    const sameCol = cols.every((x) => x === cols[0]);
+    if (cluster.length >= 2 && sameRow) {
+      const rr = rows[0], cs = cols.slice().sort((a, b) => a - b);
+      for (const cc of [cs[0] - 1, cs[cs.length - 1] + 1]) if (open(rr, cc)) queue.push([rr, cc]);
+    } else if (cluster.length >= 2 && sameCol) {
+      const cc = cols[0], rs = rows.slice().sort((a, b) => a - b);
+      for (const rr of [rs[0] - 1, rs[rs.length - 1] + 1]) if (open(rr, cc)) queue.push([rr, cc]);
+    } else {
+      // single hit (or an L-shaped cluster of touching ships) — probe all neighbors
+      for (const [hr, hc] of cluster)
+        for (const [nr, nc] of [[hr - 1, hc], [hr + 1, hc], [hr, hc - 1], [hr, hc + 1]])
+          if (open(nr, nc)) queue.push([nr, nc]);
+    }
   }
-  const valid = line.filter(([r, c]) => inBounds(r, c) && !state.playerBoard[r][c].hit);
-  ai.targetQueue = valid.concat(ai.targetQueue);
+  return queue;
 }
 
 function aiTurn() {
@@ -760,9 +793,12 @@ function wire() {
   pb.addEventListener("click", onPlaceCellClick);
   pb.addEventListener("mouseover", (e) => {
     const cell = e.target.closest(".cell");
-    if (cell && !cell.classList.contains("coord")) showPreview(Number(cell.dataset.r), Number(cell.dataset.c));
+    if (cell && !cell.classList.contains("coord")) {
+      state.hoverCell = [Number(cell.dataset.r), Number(cell.dataset.c)];
+      showPreview(state.hoverCell[0], state.hoverCell[1]);
+    }
   });
-  pb.addEventListener("mouseleave", clearPreview);
+  pb.addEventListener("mouseleave", () => { state.hoverCell = null; clearPreview(); });
   $("btn-rotate").addEventListener("click", toggleOrientation);
   $("btn-random").addEventListener("click", () => {
     placeAllRandom(state.playerBoard, state.playerShips);
@@ -816,6 +852,10 @@ function wire() {
 function toggleOrientation() {
   state.orientation = state.orientation === "H" ? "V" : "H";
   $("orientation-label").textContent = state.orientation === "H" ? "Horiz" : "Vert";
+  // refresh the live preview so the rotated footprint shows without moving the mouse
+  if (state.hoverCell && !screens.place.classList.contains("hidden")) {
+    showPreview(state.hoverCell[0], state.hoverCell[1]);
+  }
 }
 
 // ============================================================

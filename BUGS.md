@@ -112,3 +112,74 @@ ships; the final selection skips any already-fired cell and falls back to a rand
 untried cell if the map is empty. Confirmed `aiPickProbability()` returns a valid,
 unfired coordinate (e.g. `[4,4]`) with no exceptions, and that hunt/target queue
 draining takes precedence so partially-hit ships are pursued immediately.
+
+---
+
+# Debug pass: post-redesign (current)
+
+A focused debugging pass over the shipped redesign — code review plus in-browser and
+console testing. Three real bugs were found and fixed.
+
+## 10. Rotating a ship did not refresh the live placement preview
+
+**Symptom:** On the placement screen, while hovering a cell to preview a ship, pressing
+`R` (or clicking the Rotate button) flipped the orientation label from `Horiz` to `Vert`
+but the highlighted footprint on the board stayed in the old orientation. The preview
+only corrected itself after moving the mouse to another cell.
+
+**Root cause:** `toggleOrientation()` updated `state.orientation` and the label but never
+re-ran `showPreview()`. The preview was only ever recomputed from the board's `mouseover`
+handler, so rotating in place left a stale highlight.
+
+**Fix:** The board `mouseover`/`mouseleave` handlers now record the hovered cell in
+`state.hoverCell`, and `toggleOrientation()` re-calls `showPreview(state.hoverCell)` (when
+the placement screen is visible) so the rotated footprint redraws immediately.
+Verified in the browser: hovering a cell and pressing `R` flips the preview between a
+horizontal and vertical 5-cell footprint with no mouse movement.
+
+---
+
+## 11. AI "forgot" a wounded ship after sinking an adjacent one
+
+**Symptom:** Against the Captain/Admiral AI, if two ships were touching, the AI could
+stop pursuing a ship it had already damaged. It would land a hit, then after sinking a
+*different* adjacent ship it would revert to random hunting instead of finishing the
+ship it had wounded.
+
+**Root cause:** Targeting state was kept in a running list (`ai.hits`) plus a derived
+`targetQueue`. Two defects compounded:
+1. On any sink, `aiRegisterHit()` cleared **all** of `ai.hits` and the whole target
+   queue — including unresolved hits that belonged to a *different* ship.
+2. `prioritizeLine()` built its firing line from every entry in `ai.hits`, so hits
+   spanning two touching ships produced a nonsensical (or empty) line.
+
+**Fix:** Targeting is now recomputed from the board on every hit rather than from a
+running list. A new `openHits()` returns every hit cell whose ship is not yet sunk, and
+`aiTargetsFromHits()` groups those hits into connected clusters (one cluster ≈ one
+wounded ship), emitting line-extension shots for a straight cluster and neighbor probes
+otherwise. Because it reads the board, a sunk ship's cells drop out automatically while
+other wounded ships remain tracked, and clusters keep two touching ships separate.
+`prioritizeLine()`/`ai.hits` were removed.
+
+**Verification (console):** Seeded ship A vertical at `(4,5)(5,5)(6,5)` and ship B at
+`(6,6)(6,7)`, with hits on `(5,5)`, `(6,5)` (A) and `(6,6)` (B). After sinking A by
+hitting `(4,5)`, `openHits()` correctly returns only `[(6,6)]` and the target queue is
+`[(5,6),(7,6),(6,7)]` — i.e. the AI keeps hunting the still-wounded ship B instead of
+forgetting it.
+
+---
+
+## 12. "Hide enemy shots" toggle only hid misses, not hits
+
+**Symptom:** The eye toggle on *Your Fleet* (tooltip "Hide enemy shots") removed the
+enemy's miss splashes but left the red hit markers (and sunk shading) on the board, so
+it did not actually hide the enemy's shots.
+
+**Root cause:** The toggle branch in `renderBattle()` only stripped the `miss` class
+(`if (cs.hit && cs.shipId === null) … remove("miss")`).
+
+**Fix:** When the toggle is off, every fired cell on the player board now has its
+`miss`, `hit`, and `sunk` markers removed, leaving a clean view of your own ships. The
+tooltip flips between "Hide enemy shots" / "Show enemy shots". Verified in the browser:
+with the AI having scored a hit, toggling off hides both the red hit and the miss dots,
+and toggling back on restores them.
