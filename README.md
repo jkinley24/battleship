@@ -77,12 +77,6 @@ BUGS.md      # bugs found during development and how they were fixed
 - Fire at the maximum-probability cell each turn. This concentrates fire where ships
   are most likely to be and mops up gaps efficiently.
 
-## Multiplayer
-
-The reference site offers real-time 1v1 multiplayer over PubNub. This build ships the
-full single-player experience; the Multiplayer entry documents what wiring up live
-play would require (a PubNub key + a small signaling layer).
-
 ## Credits
 
 Built with [Devin](https://devin.ai). UI/UX inspired by https://shipbattle.dev.

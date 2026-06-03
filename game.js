@@ -696,7 +696,7 @@ function endGame(winner) {
 }
 
 // ============================================================
-// Modal (stats / docs / multiplayer)
+// Modal (stats / docs)
 // ============================================================
 function openModal(title, html) {
   $("modal-title").textContent = title;
@@ -725,16 +725,6 @@ function showDocs() {
     <p><b>Fleet:</b> Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2).</p>
   `);
 }
-function showMultiplayer() {
-  openModal("COMMS LINK", `
-    <p>Real-time 1v1 multiplayer over a shared channel is supported in the original
-    reference build via <b>PubNub</b>.</p>
-    <p>This deployment ships the full single-player experience. Wiring up live multiplayer
-    requires a PubNub publish/subscribe key and a small signaling layer — say the word and
-    it can be added.</p>
-  `);
-}
-
 // ============================================================
 // Audio button sync
 // ============================================================
@@ -756,7 +746,6 @@ function syncAudioButtons() {
 function wire() {
   // Home
   $("btn-single").addEventListener("click", () => { audio.ensure(); refreshRankLabels(); showScreen("difficulty"); });
-  $("btn-multi").addEventListener("click", showMultiplayer);
   $("btn-stats").addEventListener("click", showStats);
   $("btn-docs").addEventListener("click", showDocs);
 

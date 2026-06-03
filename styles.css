@@ -190,10 +190,6 @@ kbd {
 .menu-card-body { display: flex; flex-direction: column; gap: 2px; }
 .menu-card-title { font-family: var(--mono); letter-spacing: 2px; font-size: 16px; color: var(--text); }
 .menu-card-sub { color: var(--muted); font-size: 13px; }
-.tag-soon {
-  font-family: var(--mono); font-size: 10px; color: var(--amber);
-  border: 1px solid rgba(255,159,28,.4); border-radius: 4px; padding: 0 5px; margin-left: 6px;
-}
 
 /* mini buttons row */
 .mini-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
