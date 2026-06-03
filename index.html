@@ -3,65 +3,204 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Battleship — Play vs AI</title>
+  <title>Battleship — Naval Command Center</title>
+  <meta name="description" content="Play Battleship against three distinct AI opponents — Recruit, Captain, and Admiral. A naval command center built with Devin." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%9A%93</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <h1>⚓ Battleship</h1>
-    <p class="tagline">Sink the enemy fleet before it sinks yours.</p>
-  </header>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div id="app">
 
-  <main>
-    <!-- Status / messages -->
-    <div id="status" class="status" role="status" aria-live="polite">
-      Place your ships to begin.
+    <!-- ============== HOME / NAVAL COMMAND CENTER ============== -->
+    <section id="screen-home" class="screen">
+      <div class="home-inner">
+        <div class="brand">
+          <div class="brand-badge" aria-hidden="true">⚓</div>
+          <h1 class="title glow">BATTLESHIP</h1>
+          <div class="subtitle">— Naval Command Center —</div>
+          <div class="rank-line"><span class="rank-dot"></span> <span id="home-rank">ENSIGN</span></div>
+        </div>
+
+        <div class="advisory">
+          <span class="advisory-icon" aria-hidden="true">🔊</span>
+          <div>
+            <div class="advisory-title">● COMMS ADVISORY</div>
+            <div class="advisory-sub">Speakers up for sonar pings &amp; combat audio</div>
+          </div>
+        </div>
+
+        <button id="btn-single" class="menu-card" type="button">
+          <span class="menu-card-icon green" aria-hidden="true">◎</span>
+          <span class="menu-card-body">
+            <span class="menu-card-title">SINGLE PLAYER</span>
+            <span class="menu-card-sub">Battle against the AI</span>
+          </span>
+        </button>
+
+        <div class="mini-row">
+          <button class="mini-btn" id="btn-stats" type="button">▥ STATS</button>
+          <button class="mini-btn" id="btn-docs" type="button">▤ DOCS</button>
+        </div>
+
+        <div class="system-line" id="system-line">SYSTEM ONLINE // AI CORES READY</div>
+
+        <div class="briefing">
+          <div class="section-rule">◈ A I &nbsp; B R I E F I N G ◈</div>
+          <div class="briefing-grid">
+            <article class="brief-card">
+              <header><span class="brief-icon green">🛡</span><div><h3>RECRUIT</h3><span class="brief-mode">EASY MODE</span></div></header>
+              <p>Fires at completely random coordinates each turn with no memory or strategy. Every untried cell has an equal chance of being selected, making this opponent forgiving and unpredictable. Ideal for learning the ropes.</p>
+            </article>
+            <article class="brief-card">
+              <header><span class="brief-icon amber">⊕</span><div><h3>CAPTAIN</h3><span class="brief-mode">MEDIUM MODE</span></div></header>
+              <p>Uses a <strong>Hunt &amp; Target</strong> algorithm. Fires randomly until scoring a hit, then switches to target mode — probing adjacent cells and locking onto the ship's orientation to sink it efficiently. A balanced challenge that rewards smart placement.</p>
+            </article>
+            <article class="brief-card">
+              <header><span class="brief-icon red">⚡</span><div><h3>ADMIRAL</h3><span class="brief-mode">HARD MODE</span></div></header>
+              <p>Employs <strong>Probability Density</strong> mapping on top of Hunt &amp; Target. Every turn it calculates how many remaining ships could legally occupy each cell and fires at the highest-probability square. A ruthless tactician.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== SELECT THREAT LEVEL ============== -->
+    <section id="screen-difficulty" class="screen hidden">
+      <div class="home-inner">
+        <div class="brand compact">
+          <div class="brand-badge small" aria-hidden="true">⚓</div>
+          <h1 class="title glow small">BATTLESHIP</h1>
+          <div class="subtitle">— Naval Command Center —</div>
+        </div>
+        <h2 class="select-head glow">SELECT THREAT LEVEL</h2>
+        <button class="threat-card" data-diff="recruit" type="button">
+          <span class="threat-icon green">🛡</span>
+          <span class="menu-card-body"><span class="menu-card-title">RECRUIT</span><span class="menu-card-sub">Random attacks, no strategy</span></span>
+        </button>
+        <button class="threat-card" data-diff="captain" type="button">
+          <span class="threat-icon amber">⊕</span>
+          <span class="menu-card-body"><span class="menu-card-title">CAPTAIN</span><span class="menu-card-sub">Hunts ships after a hit</span></span>
+        </button>
+        <button class="threat-card" data-diff="admiral" type="button">
+          <span class="threat-icon red">⚡</span>
+          <span class="menu-card-body"><span class="menu-card-title">ADMIRAL</span><span class="menu-card-sub">Advanced probability targeting</span></span>
+        </button>
+        <button class="link-back" id="diff-back" type="button">&lt; BACK</button>
+      </div>
+    </section>
+
+    <!-- ============== PLACEMENT ============== -->
+    <section id="screen-place" class="screen hidden">
+      <div class="topbar">
+        <button class="top-link" id="place-menu" type="button">← MENU</button>
+        <div class="top-rank"><span class="rank-dot"></span> <span class="place-rank">ENSIGN</span></div>
+        <div class="top-status" id="place-status">Place your ships on the board</div>
+        <div class="top-audio">
+          <button class="audio-btn" id="place-music" type="button" title="Play Music">♪</button>
+          <button class="audio-btn" id="place-sfx" type="button" title="Mute Sonar">🔊</button>
+        </div>
+      </div>
+
+      <div class="battle-wrap place-layout">
+        <div class="board-col">
+          <h3 class="board-title glow">YOUR FLEET</h3>
+          <div id="place-board" class="board"></div>
+        </div>
+
+        <aside class="panel place-panel">
+          <h3 class="panel-title glow">PLACE YOUR FLEET</h3>
+          <p class="panel-hint">Tap a vessel to select, then tap the board to place. Press <kbd>R</kbd> to rotate.</p>
+          <div id="ship-list" class="ship-list"></div>
+          <div class="place-buttons">
+            <button id="btn-rotate" class="btn" type="button">⟳ <span id="orientation-label">Horiz</span> <kbd>R</kbd></button>
+            <button id="btn-random" class="btn" type="button">Randomize</button>
+          </div>
+          <button id="btn-undo" class="btn wide" type="button" disabled>↶ Undo Last Ship</button>
+          <button id="btn-deploy" class="btn wide primary" type="button" disabled>DEPLOY ALL VESSELS</button>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============== BATTLE ============== -->
+    <section id="screen-battle" class="screen hidden">
+      <div class="topbar">
+        <button class="top-link" id="battle-menu" type="button">← MENU</button>
+        <div class="top-rank"><span class="rank-dot"></span> <span class="battle-rank">ENSIGN</span></div>
+        <div class="top-status" id="battle-status">Your turn — fire at the enemy grid!</div>
+        <div class="top-audio">
+          <span class="turn-pill" id="turn-counter">◎ 0</span>
+          <button class="audio-btn" id="battle-music" type="button" title="Play Music">♪</button>
+          <button class="audio-btn" id="battle-sfx" type="button" title="Mute Sonar">🔊</button>
+        </div>
+      </div>
+
+      <div class="score-bar">
+        <span class="score-label green">ALLY</span>
+        <span class="score-num" id="score-ally">0</span>
+        <div class="score-track"><div class="score-fill ally" id="fill-ally"></div></div>
+        <span class="score-vs">—</span>
+        <div class="score-track"><div class="score-fill enemy" id="fill-enemy"></div></div>
+        <span class="score-num" id="score-enemy">0</span>
+        <span class="score-label red">ENEMY</span>
+      </div>
+
+      <div class="battle-wrap">
+        <div class="board-col">
+          <h3 class="board-title glow">YOUR FLEET <button class="eye-btn" id="toggle-shots" type="button" title="Hide enemy shots">👁</button></h3>
+          <div id="battle-player-board" class="board"></div>
+          <aside class="panel fleet-status">
+            <h3 class="panel-title glow">FLEET STATUS</h3>
+            <div id="fleet-status-list"></div>
+          </aside>
+        </div>
+
+        <div class="board-col">
+          <h3 class="board-title glow red-glow">ENEMY WATERS</h3>
+          <div id="battle-enemy-board" class="board enemy"></div>
+        </div>
+      </div>
+
+      <button class="log-fab" id="log-fab" type="button" title="Battle Log">▤</button>
+      <aside class="panel battle-log hidden" id="battle-log">
+        <header class="log-head">
+          <span class="panel-title glow">BATTLE LOG</span>
+          <span class="log-count" id="log-count">0 MOVES</span>
+          <button class="log-close" id="log-close" type="button">✕</button>
+        </header>
+        <div id="log-entries" class="log-entries"></div>
+      </aside>
+    </section>
+
+    <!-- ============== GAME OVER OVERLAY ============== -->
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <div class="overlay-badge" id="overlay-badge">★</div>
+        <h2 class="overlay-title glow" id="overlay-title">VICTORY</h2>
+        <p class="overlay-sub" id="overlay-sub">Enemy fleet destroyed.</p>
+        <div class="overlay-stats" id="overlay-stats"></div>
+        <div class="overlay-buttons">
+          <button class="btn primary" id="overlay-again" type="button">PLAY AGAIN</button>
+          <button class="btn" id="overlay-home" type="button">RETURN TO BASE</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Setup controls -->
-    <section id="setup-controls" class="controls">
-      <button id="btn-rotate" type="button">Rotate: <span id="orientation-label">Horizontal</span></button>
-      <button id="btn-random" type="button">Place Randomly</button>
-      <button id="btn-start" type="button" disabled>Start Battle</button>
-      <button id="btn-reset-setup" type="button">Clear Board</button>
-      <div class="ship-tray" id="ship-tray"></div>
-    </section>
-
-    <!-- In-game controls -->
-    <section id="game-controls" class="controls hidden">
-      <button id="btn-new-game" type="button">New Game</button>
-      <span class="difficulty-wrap">
-        AI:
-        <select id="difficulty">
-          <option value="easy">Easy (random)</option>
-          <option value="hard" selected>Hard (hunt &amp; target)</option>
-        </select>
-      </span>
-    </section>
-
-    <div class="boards">
-      <div class="board-wrap">
-        <h2>Your Fleet</h2>
-        <div id="player-board" class="board" aria-label="Your board"></div>
-      </div>
-      <div class="board-wrap">
-        <h2>Enemy Waters</h2>
-        <div id="enemy-board" class="board enemy" aria-label="Enemy board"></div>
+    <!-- ============== SIMPLE MODAL (stats / docs) ============== -->
+    <div id="modal" class="overlay hidden">
+      <div class="overlay-card">
+        <h2 class="overlay-title glow" id="modal-title">STATS</h2>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="overlay-buttons">
+          <button class="btn" id="modal-close" type="button">CLOSE</button>
+        </div>
       </div>
     </div>
 
-    <section class="legend">
-      <span><span class="swatch ship"></span> Ship</span>
-      <span><span class="swatch hit"></span> Hit</span>
-      <span><span class="swatch miss"></span> Miss</span>
-      <span><span class="swatch sunk"></span> Sunk</span>
-    </section>
-  </main>
-
-  <footer class="foot">
-    <p>Built with Devin. Click a cell in <strong>Enemy Waters</strong> to fire.</p>
-  </footer>
+  </div>
 
   <script src="game.js"></script>
 </body>

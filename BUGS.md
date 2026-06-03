@@ -52,3 +52,134 @@ The enemy hover rule `.board.enemy .cell:not(.fired):hover { background: var(--w
 **Symptom (potential):** Clicking the same enemy cell twice, or the AI re-selecting a cell it already shot, would waste turns or corrupt state.
 
 **Fix:** `onEnemyCellClick` returns early if the targeted cell is already `hit`. The AI's `aiPickTarget()` filters out any already-hit cell both when draining its target queue and when hunting. Confirmed across 50 simulated AI games that no shot ever lands on a previously-fired cell.
+
+---
+
+# Redesign: Naval Command Center (shipbattle.dev parity)
+
+The UI/UX was reworked into a multi-screen "naval command center" inspired by
+[shipbattle.dev](https://shipbattle.dev). The following issues were found and fixed
+during that rewrite.
+
+## 6. Invalid CSS color token (regression of the original hover bug)
+
+**Symptom:** During the rewrite a CSS custom property was generated with a malformed
+value: `--ship-edge: #5e7governs;` — not a valid color.
+
+**Why it matters:** Exactly like bug #1, an invalid `var()` value is silently dropped
+by the browser. Any rule relying on that token would have rendered with no color and
+no error. Caught on review of the new `styles.css`.
+
+**Fix:** Replaced with a valid hex (`--ship-edge: #6a7f96`). Reinforces the standing
+rule: **all CSS custom properties must hold valid values, since failures are silent.**
+
+---
+
+## 7. Coordinate headers shifted the grid cell lookup
+
+**Symptom:** The redesigned boards add a row of column labels (1–10) and a column of
+row labels (A–J), so each board grid is 11×11 of DOM children, not 10×10. The original
+`cellEl()` math assumed a flat 10×10 grid and pointed at the wrong element.
+
+**Fix:** `buildGrid()` now emits a corner + 10 header cells, then for each row a header
++ 10 play cells. `cellEl(container, r, c)` indexes with `(r + 1) * (SIZE + 1) + (c + 1)`
+to skip the header row and per-row header. Verified by firing at known enemy ship cells
+read from `state.enemyShips` and confirming the correct cells flip to hit/miss.
+
+---
+
+## 8. Strict alternating turns vs. "extra shot on hit"
+
+**Behavior change:** The original build let the player fire again after a hit. The
+reference site uses **strict alternation** — exactly one shot per side per turn,
+regardless of hit or miss. The battle loop was changed so both `onEnemyCellClick` and
+`aiTurn` always pass the turn after resolving a shot. The `state.busy` input-lock is
+still held during the AI's delayed turn so the player can't sneak in shots. Verified in
+the browser: after a player hit, the status switches to the enemy's turn and the player
+board cannot be re-fired until control returns.
+
+---
+
+## 9. Admiral (probability-density) AI — legality & termination
+
+**Risk:** The new hard AI builds a probability map by sliding every remaining ship over
+the board. Bugs here could pick an already-fired cell, ignore known misses, or fail to
+finish a wounded ship.
+
+**Fix / verification:** Placements are rejected if they cross a known miss; cells that
+already cover an unresolved hit get a large weight so the AI prioritizes sinking wounded
+ships; the final selection skips any already-fired cell and falls back to a random
+untried cell if the map is empty. Confirmed `aiPickProbability()` returns a valid,
+unfired coordinate (e.g. `[4,4]`) with no exceptions, and that hunt/target queue
+draining takes precedence so partially-hit ships are pursued immediately.
+
+---
+
+# Debug pass: post-redesign (current)
+
+A focused debugging pass over the shipped redesign — code review plus in-browser and
+console testing. Three real bugs were found and fixed.
+
+## 10. Rotating a ship did not refresh the live placement preview
+
+**Symptom:** On the placement screen, while hovering a cell to preview a ship, pressing
+`R` (or clicking the Rotate button) flipped the orientation label from `Horiz` to `Vert`
+but the highlighted footprint on the board stayed in the old orientation. The preview
+only corrected itself after moving the mouse to another cell.
+
+**Root cause:** `toggleOrientation()` updated `state.orientation` and the label but never
+re-ran `showPreview()`. The preview was only ever recomputed from the board's `mouseover`
+handler, so rotating in place left a stale highlight.
+
+**Fix:** The board `mouseover`/`mouseleave` handlers now record the hovered cell in
+`state.hoverCell`, and `toggleOrientation()` re-calls `showPreview(state.hoverCell)` (when
+the placement screen is visible) so the rotated footprint redraws immediately.
+Verified in the browser: hovering a cell and pressing `R` flips the preview between a
+horizontal and vertical 5-cell footprint with no mouse movement.
+
+---
+
+## 11. AI "forgot" a wounded ship after sinking an adjacent one
+
+**Symptom:** Against the Captain/Admiral AI, if two ships were touching, the AI could
+stop pursuing a ship it had already damaged. It would land a hit, then after sinking a
+*different* adjacent ship it would revert to random hunting instead of finishing the
+ship it had wounded.
+
+**Root cause:** Targeting state was kept in a running list (`ai.hits`) plus a derived
+`targetQueue`. Two defects compounded:
+1. On any sink, `aiRegisterHit()` cleared **all** of `ai.hits` and the whole target
+   queue — including unresolved hits that belonged to a *different* ship.
+2. `prioritizeLine()` built its firing line from every entry in `ai.hits`, so hits
+   spanning two touching ships produced a nonsensical (or empty) line.
+
+**Fix:** Targeting is now recomputed from the board on every hit rather than from a
+running list. A new `openHits()` returns every hit cell whose ship is not yet sunk, and
+`aiTargetsFromHits()` groups those hits into connected clusters (one cluster ≈ one
+wounded ship), emitting line-extension shots for a straight cluster and neighbor probes
+otherwise. Because it reads the board, a sunk ship's cells drop out automatically while
+other wounded ships remain tracked, and clusters keep two touching ships separate.
+`prioritizeLine()`/`ai.hits` were removed.
+
+**Verification (console):** Seeded ship A vertical at `(4,5)(5,5)(6,5)` and ship B at
+`(6,6)(6,7)`, with hits on `(5,5)`, `(6,5)` (A) and `(6,6)` (B). After sinking A by
+hitting `(4,5)`, `openHits()` correctly returns only `[(6,6)]` and the target queue is
+`[(5,6),(7,6),(6,7)]` — i.e. the AI keeps hunting the still-wounded ship B instead of
+forgetting it.
+
+---
+
+## 12. "Hide enemy shots" toggle only hid misses, not hits
+
+**Symptom:** The eye toggle on *Your Fleet* (tooltip "Hide enemy shots") removed the
+enemy's miss splashes but left the red hit markers (and sunk shading) on the board, so
+it did not actually hide the enemy's shots.
+
+**Root cause:** The toggle branch in `renderBattle()` only stripped the `miss` class
+(`if (cs.hit && cs.shipId === null) … remove("miss")`).
+
+**Fix:** When the toggle is off, every fired cell on the player board now has its
+`miss`, `hit`, and `sunk` markers removed, leaving a clean view of your own ships. The
+tooltip flips between "Hide enemy shots" / "Show enemy shots". Verified in the browser:
+with the AI having scored a hit, toggling off hides both the red hit and the miss dots,
+and toggling back on restores them.
