@@ -3,7 +3,7 @@
 A single-page, zero-dependency Battleship game you can play online against three
 distinct AI opponents. Pure HTML/CSS/JavaScript — no backend, no build step.
 
-The UI and gameplay are modeled on [shipbattle.dev](https://shipbattle.dev): a
+The UI and gameplay are modeled on a
 neon-green-on-navy terminal/command-center aesthetic, a multi-screen flow, a
 battle log, fleet-status readouts, and selectable threat levels.
 
