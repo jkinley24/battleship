@@ -79,4 +79,4 @@ BUGS.md      # bugs found during development and how they were fixed
 
 ## Credits
 
-Built with [Devin](https://devin.ai). UI/UX inspired by https://shipbattle.dev.
+Built with [Devin](https://devin.ai).
