@@ -192,8 +192,15 @@ function renderShipTray() {
     chip.className = "ship-chip";
     if (i === state.selectedShipIndex && !state.placed[i]) chip.classList.add("selected");
     if (state.placed[i]) chip.classList.add("placed");
-    const pips = Array.from({ length: s.size }, () => '<span class="pip"></span>').join("");
-    chip.innerHTML = `${s.name} <span class="pips">${pips}</span>`;
+    chip.append(`${s.name} `);
+    const pips = document.createElement("span");
+    pips.className = "pips";
+    for (let p = 0; p < s.size; p++) {
+      const pip = document.createElement("span");
+      pip.className = "pip";
+      pips.appendChild(pip);
+    }
+    chip.appendChild(pips);
     chip.addEventListener("click", () => {
       if (state.placed[i]) return;
       state.selectedShipIndex = i;
